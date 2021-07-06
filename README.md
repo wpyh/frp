@@ -8,7 +8,7 @@
 
 ## What is frp?
 
-frp is a fast reverse proxy to help you expose a local server behind a NAT or firewall to the Internet. As of now, it supports **TCP** and **UDP**, as well as **HTTP** and **HTTPS** protocols, where requests can be forwarded to internal services by domain name.
+frp is a fast reverse proxy to help you expose a local server behind a NAT or firewall to the Internet. It works by forwarding requests from an external server to internal servers behind NAT. As of now, it supports **TCP** and **UDP**, as well as **HTTP** and **HTTPS** protocols, where requests can be forwarded to internal services by domain name.
 
 frp also has a P2P connect mode.
 
@@ -19,8 +19,8 @@ frp also has a P2P connect mode.
 * [Development Status](#development-status)
 * [Architecture](#architecture)
 * [Example Usage](#example-usage)
-    * [Access your computer in LAN by SSH](#access-your-computer-in-lan-by-ssh)
-    * [Visit your web service in LAN by custom domains](#visit-your-web-service-in-lan-by-custom-domains)
+    * [SSH to your server behind NAT or firewall](#ssh-to-your-server-behind-nat-or-firewall)
+    * [Visit your web service behind NAT via custom domains](#visit-your-web-service-behind-nat-via-custom-domains)
     * [Forward DNS query request](#forward-dns-query-request)
     * [Forward Unix domain socket](#forward-unix-domain-socket)
     * [Expose a simple HTTP file server](#expose-a-simple-http-file-server)
@@ -85,13 +85,13 @@ frp is under development. Try the latest release version in the `master` branch,
 
 ## Example Usage
 
-Firstly, download the latest programs from [Release](https://github.com/fatedier/frp/releases) page according to your operating system and architecture.
+Firstly, download the latest version from [Releases](https://github.com/fatedier/frp/releases) page, choose one that is appropriate for your OS and architecture.
 
 Put `frps` and `frps.ini` onto your server A with public IP.
 
 Put `frpc` and `frpc.ini` onto your server B in LAN (that can't be connected from public Internet).
 
-### Access your computer in LAN by SSH
+### SSH to your server behind NAT or firewall
 
 1. Modify `frps.ini` on server A and set the `bind_port` to be connected to frp clients:
 
@@ -126,17 +126,17 @@ Note that `local_port` (listened on client) and `remote_port` (exposed on server
 
   `./frpc -c ./frpc.ini`
 
-5. From another machine, SSH to server B like this (assuming that username is `test`):
+5. From another machine outside the NAT or Firewall, SSH to server B like this (assuming that username is `test`):
 
   `ssh -oPort=6000 test@x.x.x.x`
 
-### Visit your web service in LAN by custom domains
+### Visit your web service behind NAT via custom domains
 
-Sometimes we want to expose a local web service behind a NAT network to others for testing with your own domain name and unfortunately we can't resolve a domain name to a local IP.
+Sometimes we would like to expose a local web service behind NAT or firewall, maybe to let others access it or for testing. Unfortunately, since the servers don't have a public IP address, we can't resolve a domain name to those servers directly.
 
-However, we can expose an HTTP(S) service using frp.
+We can do this using frp. In this example, we will be using http, but the method for https is similar: just swap vhost_http_port with vhost_https_port, and set type to https.
 
-1. Modify `frps.ini`, set the vhost HTTP port to 8080:
+1. Modify `frps.ini`, set the vhost http port 8080:
 
   ```ini
   # frps.ini
@@ -149,7 +149,7 @@ However, we can expose an HTTP(S) service using frp.
 
   `./frps -c ./frps.ini`
 
-3. Modify `frpc.ini` and set `server_addr` to the IP address of the remote frps server. The `local_port` is the port of your web service:
+3. Modify `frpc.ini` and set the IP address of the remote frps server as x.x.x.x. The `local_port` is the port where your web service is running. Since we omit local_ip, it is assumed to be localhost.
 
   ```ini
   # frpc.ini
@@ -185,7 +185,7 @@ However, we can expose an HTTP(S) service using frp.
 
   `./frps -c ./frps.ini`
 
-3. Modify `frpc.ini` and set `server_addr` to the IP address of the remote frps server, forward DNS query request to Google Public DNS server `8.8.8.8:53`:
+3. Modify `frpc.ini` and replace x.x.x.x with the IP address of the remote server, set local_ip to 8.8.8.8 and local_port to 53, so as to forward DNS query requests to Google's DNS server at `8.8.8.8:53`:
 
   ```ini
   # frpc.ini
@@ -210,11 +210,11 @@ However, we can expose an HTTP(S) service using frp.
 
 ### Forward Unix domain socket
 
-Expose a Unix domain socket (e.g. the Docker daemon socket) as TCP.
+In this example, we will forward a Unix domain socket (Docker daemon socket) via TCP.
 
-Configure `frps` same as above.
+Configure frps like the previous [example](#forward-dns-query-request).
 
-1. Start `frpc` with configuration:
+1. Start `frpc` with configuration, enabling the unix_domain_socket plugin:
 
   ```ini
   # frpc.ini
@@ -237,9 +237,9 @@ Configure `frps` same as above.
 
 Browser your files stored in the LAN, from public Internet.
 
-Configure `frps` same as above.
+Configure frps like the previous [example](#forward-dns-query-request).
 
-1. Start `frpc` with configuration:
+1. Start `frpc` with configuration, enabling the static_file plugin:
 
   ```ini
   # frpc.ini
@@ -306,7 +306,7 @@ Configure `frps` same as above.
   local_port = 22
   ```
 
-2. Start another `frpc` (typically on another machine C) with the following config to access the SSH service with a security key (`sk` field):
+2. Start another `frpc` (typically on another machine C) with the following config to access the SSH service with a security key (`sk` field). Remember to set the server_name to secret_ssh (matching the section name of the service on the server's frpc), and also set the secret key sk correctly:
 
   ```ini
   # frpc.ini
